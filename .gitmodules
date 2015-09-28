@@ -1,0 +1,9 @@
+[submodule "codebird"]
+	path = codebird
+	url = https://github.com/jublonet/codebird-php.git
+[submodule "normalize.css"]
+	path = normalize.css
+	url = https://github.com/necolas/normalize.css.git
+[submodule "mustache.php"]
+	path = mustache.php
+	url = https://github.com/bobthecow/mustache.php.git
