@@ -4,17 +4,24 @@ namespace Levu;
 class Twitter extends \Codebird\Codebird {
 	protected static $_instance = null;
 
+	public static function getUserID() {
+		return self::isLoggedIn() ? self::cachedCall('account_settings', array(), 'id_str') : null;
+	}
+
 	public static function getScreenName() {
-		return twitterCachedCall('account_settings', array(), 'screen_name');
+		return self::isLoggedIn() ? self::cachedCall('account_settings', array(), 'screen_name') : null;
 	}
 
 	public static function login() {
-		$cb = twitterAPI(false);
+		$cb = self::instance();
 
+		if (isset($_SESSION['oauth_verify']) && !isset($_GET['oauth_verifier'])) {
+			unset($_SESSION['oauth_token']);
+			unset($_SESSION['oauth_token_secret']);
+			unset($_SESSION['oauth_verify']);
+		}
 		if (! isset($_SESSION['oauth_token'])) {
 
-				var_dump('https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']);
-				
 				// get the request token
 				$reply = $cb->oauth_requestToken([
 						'oauth_callback' => 'https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']
@@ -45,18 +52,19 @@ class Twitter extends \Codebird\Codebird {
 				$_SESSION['oauth_token'] = $reply->oauth_token;
 				$_SESSION['oauth_token_secret'] = $reply->oauth_token_secret;
 
-				// send to same URL, without oauth GET parameters
-				header('Location: ' . basename(__FILE__));
-				die();
+				return [
+					'token' => $reply->oauth_token,
+					'secret' => $reply->oauth_token_secret	
+				];
 		}
 
-		// assign access token on each page load
 		$cb->setToken($_SESSION['oauth_token'], $_SESSION['oauth_token_secret']);
 
+		Templating::redirect();
 	}
 
 	public static function isLoggedIn() {
-		return isset($_SESSION['oauth_token']);
+		return isset($_SESSION['oauth_token']) && !isset($_SESSION['oauth_verify']);
 	}
 
 	public static function instance() {
@@ -71,7 +79,7 @@ class Twitter extends \Codebird\Codebird {
 	}
 
 	public static function getOAuthToken() {
-		if (twitterIsLoggedIn()) {
+		if (self::isLoggedIn()) {
 			return $_SESSION['oauth_token'];
 		}
 		return '';
@@ -80,7 +88,7 @@ class Twitter extends \Codebird\Codebird {
 	public static function cachedCall($method, $parameters, $field = null, $lifetime = 3600) {
 		$twitter = self::instance();
 		$refresh = false;
-		$fn = __DIR__ . 'cache/' . md5(self::getOAuthToken() . $method . serialize($parameters));
+		$fn = __DIR__ . '/../cache/' . md5(self::getOAuthToken() . $method . serialize($parameters));
 		if (!file_exists($fn)) {
 			$refresh = true;
 		} else {
@@ -88,10 +96,12 @@ class Twitter extends \Codebird\Codebird {
 		}
 		if ($refresh) {
 			$data = $twitter->$method($parameters);
+			if (isset($data->errors)) return null;
 			file_put_contents($fn, json_encode($data));
 		}
 		$data = json_decode(file_get_contents($fn), true);
 		if (!is_null($field)) {
+			if (!isset($data[$field])) return null;
 			$data = $data[$field];
 		}
 		return $data;

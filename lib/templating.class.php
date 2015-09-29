@@ -19,6 +19,11 @@ class Templating extends \Mustache_Engine {
 		header("Location: " . $_SERVER['PHP_SELF'] . '?flash=' . urlencode($message) . $ft);
 	}
 
+	public static function redirect($action = '') {
+		header('Location: ' . $_SERVER['PHP_SELF'] . '?action=' . urlencode($action));
+		die;
+	}
+
 	public function action() {
 		$action = '';
 		$m = strtolower($_SERVER['REQUEST_METHOD']);
@@ -59,7 +64,7 @@ class Templating extends \Mustache_Engine {
 	}
 
 	public function run() {
-		if (!is_null($this->action_dispatcher)) {
+		if ($this->action_dispatcher instanceof \Closure) {
 			$this->action_dispatcher->__invoke($this->action(), $this);
 		}
 		echo $this->render($this->action(), $this->vars);
